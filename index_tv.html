@@ -1,0 +1,956 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>TV Marinho</title>
+  <!-- Favicon placeholder if needed -->
+  <!-- <link rel="icon" href="favicon.ico" type="image/x-icon"> -->
+  <style>
+    /* CSS Variables for easy theming */
+    :root {
+      --bg-dark: #141414;
+      --nav-bg: #222222;
+      --text-light: #e5e5e5;
+      --accent-red: #e50914;
+      --border-color: #333;
+      --shadow-color: rgba(0, 0, 0, 0.7);
+      --highlight-shadow: rgba(229, 9, 20, 0.6);
+      --select-bg: #333;
+      --select-hover-bg: #555;
+      --focus-color: #00adef; /* Nova variável para o contorno de foco */
+    }
+
+    /* Corpo e geral */
+    body {
+      margin: 0;
+      background-color: var(--bg-dark);
+      color: var(--text-light);
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      display: flex;
+      min-height: 100vh;
+      overflow-x: hidden; /* Prevent horizontal scroll */
+    }
+
+    /* Container geral: barra fixa + conteúdo */
+    .container {
+      display: flex;
+      width: 100%;
+    }
+
+    /* Menu lateral fixo */
+    nav {
+      position: fixed;       /* fixa na tela */
+      top: 0;
+      left: 0;
+      height: 100vh;         /* altura total da tela */
+      width: 280px;          /* largura fixa da barra (aumentado para mais espaço) */
+      background-color: var(--nav-bg);
+      padding: 20px;
+      box-sizing: border-box;
+      display: flex;
+      flex-direction: column;
+      gap: 18px; /* Aumentado um pouco o espaço entre os selects */
+      overflow-y: auto;      /* permite scroll interno */
+      border-right: 1px solid var(--border-color);
+      z-index: 1000;         /* fica sobre outros elementos */
+      transition: width 0.3s ease; /* Transição suave para responsividade */
+    }
+
+    /* Conteúdo principal — empurrado para direita para não ficar atrás da barra fixa */
+    .main-container {
+      margin-left: 280px;    /* mesmo valor da largura da barra fixa */
+      flex: 1;
+      padding: 30px; /* Aumentado o padding */
+      box-sizing: border-box;
+      display: flex;
+      flex-direction: column;
+      align-items: center;   /* centraliza player e grade */
+      gap: 30px; /* Aumentado o gap */
+      background-color: var(--bg-dark);
+      min-height: 100vh;
+      overflow-y: auto;
+      width: calc(100% - 280px); /* Garante que ocupe o restante da largura */
+    }
+
+    /* Wrapper para as views dinâmicas (canais ou WarezCDN) */
+    .dynamic-content-container {
+      display: flex; /* Mantém como flex para o container principal */
+      flex-direction: column;
+      align-items: center;
+      width: 100%; /* Ocupa a largura total do main-container */
+      gap: 30px; /* Mantém o espaçamento consistente */
+    }
+
+    /* Estilo base para as views de conteúdo */
+    .content-view {
+      display: none; /* Por padrão, todas as views filhas começam ocultas */
+      flex-direction: column;
+      align-items: center;
+      width: 100%;
+      gap: inherit; /* Herda o gap do container pai */
+    }
+    
+    /* A visão padrão que deve estar visível ao iniciar */
+    #tvChannelsView {
+        display: flex; /* Esta view começa visível */
+    }
+
+    /* Estilo dos selects no menu lateral */
+    select {
+      background-color: var(--select-bg);
+      color: var(--text-light);
+      border: none;
+      border-radius: 8px; /* Mais arredondado */
+      padding: 14px 20px; /* Mais preenchimento */
+      font-size: 1em;
+      cursor: pointer;
+      width: 100%;
+      box-shadow: inset 0 0 8px var(--shadow-color); /* Sombra mais profunda */
+      appearance: none;
+      -webkit-appearance: none;
+      -moz-appearance: none;
+      background-image: url('data:image/svg+xml;utf8,<svg fill="%23e5e5e5" height="24" viewBox="0 0 24 24" width="24" xmlns="http://www.w3.org/2000/svg"><path d="M7 10l5 5 5-5z"/><path d="M0 0h24v24H0z" fill="none"/></svg>');
+      background-repeat: no-repeat;
+      background-position: right 18px center; /* Seta um pouco maior e mais distante */
+      background-size: 18px;
+      font-weight: 600;
+      transition: background-color 0.3s ease, box-shadow 0.3s ease;
+      outline: none; /* Remove o contorno padrão */
+    }
+
+    select:hover {
+      background-color: var(--select-hover-bg);
+    }
+
+    select:focus {
+      box-shadow: 0 0 0 3px var(--focus-color); /* Anel de foco */
+    }
+
+    option {
+      background-color: var(--select-bg);
+      color: var(--text-light);
+      padding: 10px; /* Adiciona preenchimento às opções */
+    }
+
+    /* Título principal */
+    .main-header {
+      width: 100%;
+      text-align: center;
+      margin-bottom: 20px; /* Margem ajustada */
+    }
+
+    .main-header h1 {
+      margin: 0;
+      font-size: 3.2em; /* Título maior */
+      color: var(--accent-red);
+      text-shadow: 0 0 15px rgba(229, 9, 20, 0.8), 0 0 5px rgba(0, 0, 0, 0.9); /* Efeito de brilho aprimorado */
+      font-weight: 900;
+      letter-spacing: 3px; /* Espaçamento de letras maior */
+      text-transform: uppercase;
+    }
+
+    /* Player de vídeo */
+    .player-container {
+      position: relative;
+      width: 80%; /* Ligeiramente mais largo */
+      aspect-ratio: 16 / 9;
+      background-color: #000;
+      border-radius: 15px; /* Cantos mais arredondados */
+      box-shadow: 0 8px 40px var(--highlight-shadow); /* Sombra mais proeminente */
+      overflow: hidden; /* Garante que o conteúdo respeite o border-radius */
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      flex-direction: column;
+      transition: box-shadow 0.3s ease;
+    }
+
+    iframe#videoPlayer {
+      width: 100%;
+      height: 100%;
+      border: none;
+      display: none; /* Escondido por padrão, mostrado por JS */
+      background-color: #000; /* Fallback */
+    }
+
+    /* Mensagem de nenhum vídeo selecionado */
+    .no-video-message {
+      text-align: center;
+      color: var(--text-light);
+      font-size: 1.5em;
+      font-weight: 500;
+      padding: 20px;
+    }
+
+    .no-video-message span {
+        display: block;
+        font-size: 0.8em;
+        color: rgba(255, 255, 255, 0.7);
+        margin-top: 10px;
+    }
+
+    /* Loading spinner */
+    .loader {
+      border: 6px solid rgba(255, 255, 255, 0.3);
+      border-top: 6px solid var(--accent-red);
+      border-radius: 50%;
+      width: 50px;
+      height: 50px;
+      animation: spin 1s linear infinite;
+      display: none; /* Escondido por padrão */
+      position: absolute; /* Para centralizar sobre o player */
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+    }
+
+    @keyframes spin {
+      0% { transform: translate(-50%, -50%) rotate(0deg); }
+      100% { transform: translate(-50%, -50%) rotate(360deg); }
+    }
+
+    /* Grade de programação */
+    iframe#gradeIframe {
+      width: 80%; /* Igual à largura do player */
+      height: 500px; /* Altura aumentada */
+      border: none;
+      border-radius: 15px;
+      background-color: #000;
+      box-shadow: 0 8px 40px var(--highlight-shadow);
+      transition: box-shadow 0.3s ease;
+    }
+
+    /* NOVO ESTILO: iframe para o conteúdo da WarezCDN */
+    iframe#warezCdnContentIframe {
+      width: 80%; /* Corresponde à largura do player */
+      height: 700px; /* Altura generosa para o conteúdo da página */
+      border: none;
+      border-radius: 15px;
+      background-color: #000;
+      box-shadow: 0 8px 40px var(--highlight-shadow);
+      transition: box-shadow 0.3s ease;
+    }
+
+    /* NOVO ESTILO: Mensagem de carregamento para WarezCDN */
+    #warezCdnLoadingMessage {
+        text-align: center;
+        color: var(--text-light);
+        font-size: 1.5em;
+        font-weight: 500;
+        padding: 20px;
+        margin-top: 20px; /* Espaçamento da parte superior */
+    }
+
+    /* Style for the new back button in WarezCDN view */
+    .warez-back-button {
+      background-color: var(--accent-red);
+      color: var(--text-light);
+      border: none;
+      border-radius: 8px;
+      padding: 12px 20px;
+      font-size: 1.1em;
+      cursor: pointer;
+      margin-bottom: 20px; /* Space between button and iframe */
+      box-shadow: 0 4px 15px rgba(229, 9, 20, 0.4);
+      transition: background-color 0.3s ease, transform 0.2s ease, box-shadow 0.3s ease;
+      outline: none; /* Remove o contorno padrão */
+    }
+
+    .warez-back-button:hover {
+      background-color: #ff2a38; /* Slightly brighter red */
+      transform: translateY(-2px);
+      box-shadow: 0 6px 20px rgba(229, 9, 20, 0.6);
+    }
+    /* Estilo de foco para o botão de voltar */
+    .warez-back-button:focus {
+        box-shadow: 0 0 0 4px var(--focus-color);
+    }
+
+
+    /* Estilização da Barra de Rolagem (navegadores Webkit) */
+    ::-webkit-scrollbar {
+      width: 10px;
+      height: 10px;
+    }
+
+    ::-webkit-scrollbar-track {
+      background: var(--nav-bg);
+      border-radius: 10px;
+    }
+
+    ::-webkit-scrollbar-thumb {
+      background: var(--select-hover-bg);
+      border-radius: 10px;
+      border: 2px solid var(--nav-bg);
+    }
+
+    ::-webkit-scrollbar-thumb:hover {
+      background: var(--accent-red);
+    }
+
+    /* Responsividade */
+    @media (max-width: 992px) { /* Ajuste para telas um pouco maiores */
+      .main-header h1 {
+        font-size: 2.8em;
+      }
+      .player-container, iframe#gradeIframe, iframe#warezCdnContentIframe { /* Inclui o novo iframe */
+        width: 95%; /* Ajusta a largura para telas um pouco menores */
+      }
+      iframe#warezCdnContentIframe {
+        height: 600px; /* Ajusta altura para telas menores */
+      }
+    }
+
+    @media (max-width: 768px) {
+      body {
+        flex-direction: column;
+      }
+      .container {
+        flex-direction: column;
+      }
+      nav {
+        position: relative;  /* a barra se torna parte do fluxo normal */
+        width: 100%;
+        height: auto;
+        flex-direction: row; /* itens da nav ficam lado a lado */
+        overflow-x: auto; /* permite rolagem horizontal para os selects */
+        padding: 10px;
+        border-right: none;
+        border-bottom: 1px solid var(--border-color);
+        gap: 10px; /* Reduz o gap entre os selects */
+        white-space: nowrap; /* Impede que os selects quebrem linha */
+        justify-content: flex-start; /* Alinha selects ao início */
+      }
+
+      nav select {
+        flex-shrink: 0; /* Impede que os selects diminuam muito */
+        width: auto; /* Largura automática para se adaptar ao conteúdo */
+        min-width: 160px; /* Largura mínima para selects */
+        padding: 10px 15px; /* Padding menor */
+        font-size: 0.9em;
+        border-radius: 6px;
+      }
+
+      nav select:not(:last-child) {
+        margin-right: 10px; /* Espaço entre os selects */
+      }
+
+      .main-container {
+        margin-left: 0;     /* remove margem lateral no mobile */
+        padding: 20px 15px; /* Padding ajustado para mobile */
+        min-height: auto;
+        width: 100%; /* Ocupa a largura total */
+      }
+      .main-header h1 {
+        font-size: 2.2em;
+        letter-spacing: 2px;
+      }
+      .player-container, iframe#gradeIframe, iframe#warezCdnContentIframe { /* Inclui o novo iframe */
+        width: 100%; /* Largura total para mobile */
+        box-shadow: 0 4px 20px var(--highlight-shadow); /* Sombra menos intensa */
+      }
+      iframe#gradeIframe {
+        height: 350px; /* Altura ajustada */
+      }
+      iframe#warezCdnContentIframe { /* Ajuste de altura para mobile */
+        height: 500px;
+      }
+    }
+
+    @media (max-width: 480px) {
+        .main-header h1 {
+            font-size: 1.8em;
+            letter-spacing: 1px;
+        }
+        .no-video-message, #warezCdnLoadingMessage { /* Ajusta também a nova mensagem */
+            font-size: 1.2em;
+        }
+        .loader {
+            width: 40px;
+            height: 40px;
+            border-width: 5px;
+        }
+        iframe#warezCdnContentIframe {
+            height: 400px; /* Altura menor para telas muito pequenas */
+        }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <nav>
+      <!-- Mantendo a estrutura original dos selects -->
+      <select id="videoList1">
+        <option value="" disabled selected>Canais Abertos</option>
+        <option value="https://embedtv-3.icu/globosp" data-grade="https://meuguia.tv/programacao/canal/GRD">Globo SP</option>
+        <option value="https://%72%65%64%65%63%61%6E%61%69%73%74%76%2E%65%65/player3/ch.php?canal=bobosp" data-grade="https://meuguia.tv/programacao/canal/GRD">Globo SP 2</option>
+		<option value="https://www.embedtv.net/embed/globo-sp" data-grade="https://meuguia.tv/programacao/canal/GRD">Globo SP 3</option>
+        <option value="https://embedtv-3.icu/sbt" data-grade="https://meuguia.tv/programacao/canal/SBT">SBT</option>
+        <option value="https://%72%65%64%65%63%61%6E%61%69%73%74%76%2E%67%64/player3/ch.php?canal=sbt" data-grade="https://meuguia.tv/programacao/canal/SBT">SBT 2</option>
+        <option value="https://embedtv-3.icu/record" data-grade="https://meuguia.tv/programacao/canal/REC">Record</option>
+        <option value="https://%72%65%64%65%63%61%6E%61%69%73%74%76%2E%67%64/player3/ch.php?canal=record" data-grade="https://meuguia.tv/programacao/canal/REC">Record 2</option>
+        <option value="https://embedtv-3.icu/band" data-grade="https://meuguia.tv/programacao/canal/BAN">Band</option>
+        <option value="https://%72%65%64%65%63%61%6E%61%69%73%74%76%2E%67%64/player3/ch.php?canal=band" data-grade="https://meuguia.tv/programacao/canal/BAN">Band 2</option>
+        <option value="https://%72%65%64%65%63%61%6E%61%69%73%74%76%2E%67%64/player3/ch.php?canal=redetv" data-grade="https://meuguia.tv/programacao/canal/CBR">Rede TV</option>
+        <option value="https://reidoscanais.life/embed/?id=tvcultura" allow="encrypted-media" data-grade="https://meuguia.tv/programacao/canal/CUL">TV Cultura</option>
+      </select>
+      <select id="videoList2">
+        <option value="" disabled selected>Filmes</option>
+        <option value="https://embedtv-3.icu/telecinepremium" data-grade="https://meuguia.tv/programacao/canal/TC1">Telecine Premium</option>
+        <option value="https://%72%65%64%65%63%61%6E%61%69%73%74%76%2E%67%64/player3/ch.php?canal=telecinepremium" data-grade="https://meuguia.tv/programacao/canal/TC1">Telecine Premium 2</option>
+        <option value="https://embedtv-3.icu/telecinepipoca" data-grade="https://meuguia.tv/programacao/canal/TC4">Telecine Pipoca</option>
+        <option value="https://%72%65%64%65%63%61%6E%61%69%73%74%76%2E%67%64/player3/ch.php?canal=telecinepipoca" data-grade="https://meuguia.tv/programacao/canal/TC4">Telecine Pipoca 2</option>
+        <option value="https://%72%65%64%65%63%61%6E%61%69%73%74%76%2E%67%64/player3/ch.php?canal=telecineaction" data-grade="https://meuguia.tv/programacao/canal/TC2">Telecine Action</option>
+        <option value="https://embedtv-3.icu/telecineaction" data-grade="https://meuguia.tv/programacao/canal/TC2">Telecine Action 2</option>
+        <option value="https://embedtv-3.icu/telecinetouch" data-grade="https://meuguia.tv/programacao/canal/TC3">Telecine Touch</option>
+        <option value="https://%72%65%64%65%63%61%6E%61%69%73%74%76%2E%67%64/player3/ch.php?canal=telecinetouch" data-grade="https://meuguia.tv/programacao/canal/TC3">Telecine Touch 2</option>
+        <option value="https://embedtv-3.icu/telecinefun" data-grade="https://meuguia.tv/programacao/canal/TC6">Telecine Fun</option>
+        <option value="https://%72%65%64%65%63%61%6E%61%69%73%74%76%2E%67%64/player3/ch.php?canal=telecinefun" data-grade="https://meuguia.tv/programacao/canal/TC6">Telecine Fun 2</option>
+        <option value="https://embedtv-3.icu/telecinecult" data-grade="https://meuguia.tv/programacao/canal/TC5">Telecine Cult</option>
+        <option value="https://%72%65%64%65%63%61%6E%61%69%73%74%76%2E%67%64/player3/ch.php?canal=telecinecult" data-grade="https://meuguia.tv/programacao/canal/TC5">Telecine Cult 2</option>
+        <option value="https://embedtv-3.icu/hbo" data-grade="https://meuguia.tv/programacao/canal/HBO">HBO</option>
+        <option value="https://%72%65%64%65%63%61%6E%61%69%73%74%76%2E%67%64/player3/ch.php?canal=hbo" data-grade="https://meuguia.tv/programacao/canal/HBO">HBO 2</option>
+        <option value="https://embedtv-3.icu/hbo2" data-grade="https://meuguia.tv/programacao/canal/HB2">HBO2</option>
+        <option value="https://%72%65%64%65%63%61%6E%61%69%73%74%76%2E%67%64/player3/ch.php?canal=hbo2" data-grade="https://meuguia.tv/programacao/canal/HB2">HBO2 2</option>
+        <option value="https://embedtv-3.icu/hboplus" data-grade="https://meuguia.tv/programacao/canal/HPL">HBO Plus</option>
+        <option value="https://%72%65%64%65%63%61%6E%61%69%73%74%76%2E%67%64/player3/ch.php?canal=hboplus" data-grade="https://meuguia.tv/programacao/canal/HPL">HBO Plus 2</option>
+        <option value="https://embedtv-3.icu/hbofamily" data-grade="https://meuguia.tv/programacao/canal/HFA">HBO Family</option>
+        <option value="https://%72%65%64%65%63%61%6E%61%69%73%74%76%2E%67%64/player3/ch.php?canal=hbofamily" data-grade="https://meuguia.tv/programacao/canal/HFA">HBO Family 2</option>
+        <option value="https://%72%65%64%65%63%61%6E%61%69%73%74%76%2E%67%64/player3/ch.php?canal=hbosignature" data-grade="https://meuguia.tv/programacao/canal/HFE">HBO Signature</option>
+        <option value="https://embedtv-3.icu/hboxtreme" data-grade="https://www.guiadetv.com/canal/hbo-xtreme">HBO Xtreme</option>
+        <option value="https://%72%65%64%65%63%61%6E%61%69%73%74%76%2E%67%64/player3/ch.php?canal=hboxtreme" data-grade="https://www.guiadetv.com/canal/hbo-xtreme">HBO Xtreme 2</option>
+        <option value="https://embedtv-3.icu/hbomundi" data-grade="https://www.guiadetv.com/canal/hbo-mundi">HBO Mundi</option>
+        <option value="https://%72%65%64%65%63%61%6E%61%69%73%74%76%2E%67%64/player3/ch.php?canal=hbomundi" data-grade="https://www.guiadetv.com/canal/hbo-mundi">HBO Mundi 2</option>
+        <option value="https://embedtv-3.icu/hbopop" data-grade="https://www.guiadetv.com/canal/hbo-pop">HBO POP</option>
+        <option value="https://%72%65%64%65%63%61%6E%61%69%73%74%76%2E%67%64/player3/ch.php?canal=hbopop" data-grade="https://www.guiadetv.com/canal/hbo-pop">HBO POP 2</option>
+        <option value="https://%72%65%64%65%63%61%6E%61%69%73%74%76%2E%67%64/player3/ch.php?canal=amc" data-grade="https://meuguia.tv/programacao/canal/MGM">AMC</option>
+        <option value="https://embedtv-3.icu/axn" data-grade="https://meuguia.tv/programacao/canal/AXN">AXN</option>
+        <option value="https://%72%65%64%65%63%61%6E%61%69%73%74%76%2E%67%64/player3/ch.php?canal=axn" data-grade="https://meuguia.tv/programacao/canal/AXN">AXN 2</option>
+        <option value="https://embedtv-3.icu/fx" data-grade="https://programacao.tv/fx">FX</option>
+        <option value="https://embedtv-3.icu/megapix" data-grade="https://meuguia.tv/programacao/canal/MPX">Megapix</option>
+        <option value="https://%72%65%64%65%63%61%6E%61%69%73%74%76%2E%67%64/player3/ch.php?canal=megapix" data-grade="https://meuguia.tv/programacao/canal/MPX">Megapix 2</option>
+        <option value="https://embedtv-3.icu/studiouniversal" data-grade="https://meuguia.tv/programacao/canal/HAL">Studio Universal</option>
+        <option value="https://%72%65%64%65%63%61%6E%61%69%73%74%76%2E%67%64/player3/ch.php?canal=studiouniversal" data-grade="https://meuguia.tv/programacao/canal/HAL">Studio Universal 2</option>
+        <option value="https://embedtv-3.icu/cinemax" data-grade="https://meuguia.tv/programacao/canal/MNX">Cinemax</option>
+        <option value="https://%72%65%64%65%63%61%6E%61%69%73%74%76%2E%67%64/player3/ch.php?canal=cinemax" data-grade="https://meuguia.tv/programacao/canal/MNX">Cinemax 2</option>
+        <option value="https://embedtv-3.icu/sonychannel" data-grade="https://meuguia.tv/programacao/canal/SET">Sony Channel</option>
+        <option value="https://%72%65%64%65%63%61%6E%61%69%73%74%76%2E%67%64/player3/ch.php?canal=sony" data-grade="https://meuguia.tv/programacao/canal/SET">Sony Channel 2</option>
+        <option value="https://%72%65%64%65%63%61%6E%61%69%73%74%76%2E%67%64/player3/ch.php?canal=sonymovies" data-grade="https://www.guiadetv.com/canal/sony-movies">Sony Movies</option>
+        <option value="https://embedtv-3.icu/space" data-grade="https://meuguia.tv/programacao/canal/SPA">Space</option>
+        <option value="https://%72%65%64%65%63%61%6E%61%69%73%74%76%2E%67%64/player3/ch.php?canal=space" data-grade="https://meuguia.tv/programacao/canal/SPA">Space 2</option>
+        <option value="https://embedtv-3.icu/starchannel" data-grade="https://www.claro.com.br/tv-por-assinatura/programacao/grade/programa/star-channel-hd/1-2429?srsltid=AfmBOooTiCFBK1DrJpHOeKFpqWzjxax1Q2QfpoJLxQMpi5cpYSl8ZnQt">Star Channel</option>
+        <option value="https://embedtv-3.icu/warnerchannel" data-grade="https://meuguia.tv/programacao/canal/WBT">Warner TV</option>
+        <option value="https://%72%65%64%65%63%61%6E%61%69%73%74%76%2E%67%64/player3/ch.php?canal=warner" data-grade="https://meuguia.tv/programacao/canal/WBT">Warner TV 2</option>
+        <option value="https://embedtv-3.icu/tlc" data-grade="https://meuguia.tv/programacao/canal/TRV" data-grade="https://meuguia.tv/programacao/canal/TRV">TLC</option>
+        <option value="https://%72%65%64%65%63%61%6E%61%69%73%74%76%2E%67%64/player3/ch.php?canal=tlc" data-grade="https://meuguia.tv/programacao/canal/TRV">TLC 2</option>
+        <option value="https://embedtv-3.icu/ae" data-grade="https://meuguia.tv/programacao/canal/MDO">A&E</option>
+        <option value="https://%72%65%64%65%63%61%6E%61%69%73%74%76%2E%67%64/player3/ch.php?canal=aie" data-grade="https://meuguia.tv/programacao/canal/MDO">A&E 2</option>
+        <option value="https://embedtv-3.icu/tnt" data-grade="https://meuguia.tv/programacao/canal/TNT">TNT</option>
+        <option value="https://%72%65%64%65%63%61%6E%61%69%73%74%76%2E%67%64/player3/ch.php?canal=tnt" data-grade="https://meuguia.tv/programacao/canal/TNT">TNT 2</option>
+        <option value="https://embedtv-3.icu/tntnovelas" data-grade="https://www.guiadetv.com/canal/tnt-novelas">TNT Novelas</option>
+        <option value="https://%72%65%64%65%63%61%6E%61%69%73%74%76%2E%67%64/player3/ch.php?canal=tntnovelas" data-grade="https://www.guiadetv.com/canal/tnt-novelas">TNT Novelas 2</option>
+        <option value="https://embedtv-3.icu/tntseries" data-grade="https://meuguia.tv/programacao/canal/TNS">TNT Series</option>
+        <option value="https://%72%65%64%65%63%61%6E%61%69%73%74%76%2E%67%64/player3/ch.php?canal=tntseries" data-grade="https://meuguia.tv/programacao/canal/TNS">TNT Series 2</option>
+        <option value="https://embedtv-3.icu/tcm" data-grade="https://meuguia.tv/programacao/canal/TCM">TCM</option>
+      </select>
+      <select id="videoList3">
+        <option value="" disabled selected>Séries</option>
+        <option value="https://reidoscanais.life/embed/?id=syfy" allow="encrypted-media" data-grade="https://www.guiadetv.com/canal/syfy">SyFy</option>
+        <option value="https://embedtv-3.icu/universaltv" data-grade="https://meuguia.tv/programacao/canal/USA">Universal TV</option>
+        <option value="//%72%65%64%65%63%61%6E%61%69%73%74%76%2E%67%64/player3/ch.php?canal=universal" data-grade="https://meuguia.tv/programacao/canal/USA">Universal TV 2</option>
+        <option value="https://reidoscanais.life/embed/?id=universalpremiere" allow="encrypted-media" data-grade="https://www.tvplus.com.br/programacao/universal-premiere">Universal Premiere</option>
+        <option value="https://reidoscanais.life/embed/?id=universalreality" allow="encrypted-media" data-grade="https://www.tvplus.com.br/programacao/universal-reality">Universal Reality</option>
+        <option value="https://embedtv-3.icu/warnerchannel" data-grade="https://meuguia.tv/programacao/canal/WBT">Warner Channel</option>
+        <option value="https://%72%65%64%65%63%61%6E%61%69%73%74%76%2E%67%64/player3/ch.php?canal=warner" data-grade="https://meuguia.tv/programacao/canal/WBT">Warner Channel 2</option>
+      </select>
+      <select id="videoList4">
+        <option value="" disabled selected>Esporte</option>
+        <option value="https://embedtv-3.icu/espn" data-grade="https://meuguia.tv/programacao/canal/ESPN" data-grade="https://meuguia.tv/programacao/canal/ESP">ESPN</option>
+        <option value="https://%72%65%64%65%63%61%6E%61%69%73%74%76%2E%67%64/player3/ch.php?canal=espn" data-grade="https://meuguia.tv/programacao/canal/ESP">ESPN 2</option>
+        <option value="https://embedtv-3.icu/espn2" data-grade="https://meuguia.tv/programacao/canal/ES2">ESPN2</option>
+        <option value="https://%72%65%64%65%63%61%6E%61%69%73%74%76%2E%67%64/player3/ch.php?canal=espn2" data-grade="https://meuguia.tv/programacao/canal/ES2">ESPN2 2</option>
+        <option value="https://embedtv-3.icu/espn3" data-grade="https://meuguia.tv/programacao/canal/ES3">ESPN3</option>
+        <option value="https://%72%65%64%65%63%61%6E%61%69%73%74%76%2E%67%64/player3/ch.php?canal=espn3" data-grade="https://meuguia.tv/programacao/canal/ES3">ESPN3 2</option>
+        <option value="https://embedtv-3.icu/espn4" data-grade="https://meuguia.tv/programacao/canal/ES4">ESPN4</option>
+        <option value="https://%72%65%64%65%63%61%6E%61%69%73%74%76%2E%67%64/player3/ch.php?canal=espn4" data-grade="https://meuguia.tv/programacao/canal/ES4">ESPN4 2</option>
+        <option value="https://embedtv-3.icu/espn5" data-grade="https://meuguia.tv/programacao/canal/ES5">ESPN5</option>
+        <option value="https://%72%65%64%65%63%61%6E%61%69%73%74%76%2E%67%64/player3/ch.php?canal=espn5" data-grade="https://meuguia.tv/programacao/canal/ES5">ESPN5 2</option>
+        <option value="https://embedtv-3.icu/espn6" data-grade="https://www.guiadetv.com/canal/espn-6">ESPN6</option>
+        <option value="https://%72%65%64%65%63%61%6E%61%69%73%74%76%2E%67%64/player3/ch.php?canal=espn6" data-grade="https://www.guiadetv.com/canal/espn-6">ESPN6 2</option>
+        <option value="https://embedtv-3.icu/sportv" data-grade="https://meuguia.tv/programacao/canal/SPO">Sportv</option>
+        <option value="https://%72%65%64%65%63%61%6E%61%69%73%7476%2E%67%64/player3/ch.php?canal=sportv1" data-grade="https://meuguia.tv/programacao/canal/SPO">Sportv 2</option>
+        <option value="https://embedtv-3.icu/sportv2" data-grade="https://meuguia.tv/programacao/canal/SP2">Sportv2</option>
+        <option value="https://%72%65%64%65%63%61%6E%61%69%73%7476%2E%67%64/player3/ch.php?canal=sportv2" data-grade="https://meuguia.tv/programacao/canal/SP2">Sportv2 2</option>
+        <option value="https://embedtv-3.icu/sportv3" data-grade="https://meuguia.tv/programacao/canal/SP3">Sportv3</option>
+        <option value="https://%72%65%64%65%63%61%6E%61%69%73%7476%2E%67%64/player3/ch.php?canal=sportv3" data-grade="https://meuguia.tv/programacao/canal/SP3">Sportv3 2</option>
+        <option value="https://embedtv-3.icu/sportv4" data-grade="https://tudonumclick.com/programacao-tv/sport-tv4/">Sportv4</option>
+        <option value="https://reidoscanais.life/embed/?id=sportv4" allow="encrypted-media" data-grade="https://tudonumclick.com/programacao-tv/sport-tv4/">Sportv4 2</option>
+        <option value="https://embedtv-3.icu/premiere" data-grade="https://meuguia.tv/programacao/canal/121">Premiere</option>
+        <option value="https://%72%65%64%65%63%61%6E%61%69%73%7476%2E%67%64/player3/ch.php?canal=premiereclubes" data-grade="https://meuguia.tv/programacao/canal/121">Premiere 2</option>
+        <option value="https://embedtv-3.icu/premiere2" data-grade="https://www.guiadetv.com/canal/premiere-2">Premiere2</option>
+        <option value="https://%72%65%64%65%63%61%6E%61%69%73%7476%2E%67%64/player3/ch.php?canal=premiere2" data-grade="https://www.guiadetv.com/canal/premiere-2">Premiere2 2</option>
+        <option value="https://embedtv-3.icu/premiere3" data-grade="https://www.guiadetv.com/canal/premiere-3">Premiere3</option>
+        <option value="https://%72%65%64%65%63%61%6E%61%69%73%7476%2E%67%64/player3/ch.php?canal=premiere3" data-grade="https://www.guiadetv.com/canal/premiere-3">Premiere3 2</option>
+        <option value="https://embedtv-3.icu/premiere4" data-grade="https://www.guiadetv.com/canal/premiere-4">Premiere4</option>
+        <option value="https://%72%65%64%65%63%61%6E%61%69%73%7476%2E%67%64/player3/ch.php?canal=premiere4" data-grade="https://www.guiadetv.com/canal/premiere-4">Premiere4 2</option>
+        <option value="https://embedtv-3.icu/premiere5" data-grade="https://www.guiadetv.com/canal/premiere-5">Premiere5</option>
+        <option value="https://%72%65%64%65%63%61%6E%61%69%73%7476%2E%67%64/player3/ch.php?canal=premiere5" data-grade="https://www.guiadetv.com/canal/premiere-5">Premiere5 2</option>
+        <option value="https://embedtv-3.icu/premiere6" data-grade="https://www.guiadetv.com/canal/premiere-6">Premiere6</option>
+        <option value="https://%72%65%64%65%63%61%6E%61%69%73%7476%2E%67%64/player3/ch.php?canal=premiere6" data-grade="https://www.guiadetv.com/canal/premiere-6">Premiere6 2</option>
+        <option value="https://embedtv-3.icu/premiere7" data-grade="https://www.guiadetv.com/canal/premiere-7">Premiere7</option>
+        <option value="https://%72%65%64%65%63%61%6E%61%69%73%7476%2E%67%64/player3/ch.php?canal=premiere7" data-grade="https://www.guiadetv.com/canal/premiere-7">Premiere7 2</option>
+        <option value="https://embedtv-3.icu/premiere8" data-grade="https://mi.tv/br/canais/premiere-8-hd">Premiere8</option>
+        <option value="https://reidoscanais.life/embed/?id=premiere8" allow="encrypted-media" data-grade="https://mi.tv/br/canais/premiere-8-hd">Premiere8 2</option>
+        <option value="https://embedtv-3.icu/ufcfightpass" data-grade="">UFC Fight Pass</option>
+        <option value="https://%72%65%64%65%63%61%6E%61%69%73%7476%2E%67%64/player3/ch.php?canal=ufcfightpass" data-grade="">UFC Fight Pass 2</option>
+      </select>
+      <select id="videoList5">
+        <option value="" disabled selected>Infantil</option>
+        <option value="https://embedtv-3.icu/discoverykids" data-grade="https://meuguia.tv/programacao/canal/DIK">Discovery Kids</option>
+        <option value="https://%72%65%64%65%63%61%6E%61%69%73%7476%2E%67%64/player3/ch.php?canal=discoverykids" data-grade="https://meuguia.tv/programacao/canal/DIK">Discovery Kids 2</option>
+        <option value="https://embedtv-3.icu/cartoonnetwork" data-grade="https://meuguia.tv/programacao/canal/CAR">Cartoon Network</option>
+        <option value="https://%72%65%64%65%63%61%6E%61%69%73%7476%2E%67%64/player3/ch.php?canal=cartoon" data-grade="https://meuguia.tv/programacao/canal/CAR">Cartoon Network 2</option>
+        <option value="https://embedtv-3.icu/cartoonito" data-grade="https://www.guiadetv.com/canal/cartoonito">Cartoonito</option>
+        <option value="https://%72%65%64%65%63%61%6E%61%69%73%7476%2E%67%64/player3/ch.php?canal=cartoonito" data-grade="https://www.guiadetv.com/canal/cartoonito">Cartoonito 2</option>
+        <option value="https://embedtv-3.icu/nickelodeon" data-grade="https://meuguia.tv/programacao/canal/NIC">Nickelodeon</option>
+        <option value="https://%72%65%64%65%63%61%6E%61%69%73%7476%2E%67%64/player3/ch.php?canal=nick" data-grade="https://meuguia.tv/programacao/canal/NIC">Nickelodeon 2</option>
+        <option value="https://%72%65%64%65%63%61%6E%61%69%73%7476%2E%67%64/player3/ch.php?canal=gloob" data-grade="https://meuguia.tv/programacao/canal/GOB">Gloob</option>
+      </select>
+      <select id="videoList6">
+        <option value="" disabled selected>Variedades</option>
+        <option value="https://embedtv-3.icu/multishow" data-grade="https://meuguia.tv/programacao/canal/MSW">Multishow</option>
+        <option value="https://%72%65%64%65%63%61%6E%61%69%73%7476%2E%67%64/player3/ch.php?canal=multishow" data-grade="https://meuguia.tv/programacao/canal/MSW">Multishow 2</option>
+        <option value="https://embedtv-3.icu/gnt" data-grade="https://meuguia.tv/programacao/canal/GNT">GNT</option>
+        <option value="https://%72%65%64%65%63%61%6E%61%69%73%7476%2E%67%64/player3/ch.php?canal=gnt" data-grade="https://meuguia.tv/programacao/canal/GNT">GNT 2</option>
+        <option value="https://embedtv-3.icu/viva" data-grade="https://meuguia.tv/programacao/canal/VIV">Viva</option>
+        <option value="https://reidoscanais.life/embed/?id=viva" allow="encrypted-media" data-grade="https://meuguia.tv/programacao/canal/VIV">Viva 2</option>
+        <option value="https://%72%65%64%65%63%61%6E%61%69%73%7476%2E%67%64/player3/ch.php?canal=bis" data-grade="https://meuguia.tv/programacao/canal/MSH">Bis</option>
+        <option value="https://reidoscanais.life/embed/?id=bis" allow="encrypted-media" data-grade="https://meuguia.tv/programacao/canal/MSH">Bis 2</option>
+        <option value="https://%72%65%64%65%63%61%6E%61%69%73%7476%2E%67%64/player3/ch.php?canal=canalbrasil" data-grade="https://meuguia.tv/programacao/canal/CBR">Canal Brasil</option>
+        <option value="https://reidoscanais.life/embed/?id=canalbrasil" allow="encrypted-media" data-grade="https://meuguia.tv/programacao/canal/CBR">Canal Brasil 2</option>
+      </select>
+      <!-- NOVO SELETOR: Filmes, Séries e Animes -->
+      <select id="warezCdnSelector">
+        <option value="" disabled selected>Filmes, Séries e Animes</option>
+        <option value="https://warezcdn.link/conteudo">Acessar Catálogo</option>
+      </select>
+    </nav>
+
+    <main class="main-container">
+      <header class="main-header">
+        <h1>TV Marinho</h1>
+      </header>
+
+      <!-- NOVO: Contêiner para alternar entre as visões de conteúdo -->
+      <div id="dynamicContentContainer" class="dynamic-content-container">
+        <!-- Visão de Canais de TV (padrão) -->
+        <div id="tvChannelsView" class="content-view">
+          <div class="player-container">
+            <iframe id="videoPlayer" src="" allowfullscreen allow="autoplay; fullscreen" scrolling="no"></iframe>
+            <div class="loader" id="playerLoader"></div>
+            <div class="no-video-message" id="noVideoMessage">
+                Bem-vindo à TV Marinho! <br>
+                <span>Selecione um canal para começar a assistir.</span>
+            </div>
+          </div>
+          <iframe id="gradeIframe" src=""></iframe>
+        </div>
+
+        <!-- Visão de WarezCDN -->
+        <div id="warezCdnView" class="content-view">
+            <!-- Botão de voltar para o catálogo WarezCDN -->
+            <button id="backToWarezCdnCatalog" class="warez-back-button" style="display: none;">← Voltar para o Catálogo</button>
+            <iframe id="warezCdnContentIframe" src="" allowfullscreen allow="autoplay; fullscreen" scrolling="no"></iframe>
+            <div class="loader" id="warezCdnLoader"></div>
+            <div class="no-video-message" id="warezCdnLoadingMessage">
+                Carregando catálogo WarezCDN...
+            </div>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
+  <script>
+    // Referências aos elementos HTML existentes e aos novos
+    const selects = document.querySelectorAll('nav select');
+    const videoPlayer = document.getElementById('videoPlayer');
+    const gradeIframe = document.getElementById('gradeIframe');
+    const playerLoader = document.getElementById('playerLoader');
+    const noVideoMessage = document.getElementById('noVideoMessage');
+
+    let currentGradeRefreshInterval = null; // Para gerenciar o intervalo de atualização da grade de TV
+
+    // Elementos para a visão WarezCDN
+    const tvChannelsView = document.getElementById('tvChannelsView');
+    const warezCdnView = document.getElementById('warezCdnView');
+    const warezCdnContentIframe = document.getElementById('warezCdnContentIframe');
+    const warezCdnLoader = document.getElementById('warezCdnLoader');
+    const warezCdnLoadingMessage = document.getElementById('warezCdnLoadingMessage');
+    const backToWarezCdnCatalog = document.getElementById('backToWarezCdnCatalog'); // Novo botão
+
+    let userInteracted = false; // Flag para controlar a primeira interação do usuário
+
+    // Funções auxiliares para o player de TV
+    function showPlayerLoader() {
+        playerLoader.style.display = 'block';
+        videoPlayer.style.display = 'none';
+        noVideoMessage.style.display = 'none';
+    }
+
+    function hidePlayerLoader() {
+        playerLoader.style.display = 'none';
+        videoPlayer.style.display = 'block';
+        noVideoMessage.style.display = 'none';
+    }
+
+    function showNoPlayerMessage(message = 'Selecione um canal para começar a assistir.') {
+        videoPlayer.style.display = 'none';
+        playerLoader.style.display = 'none';
+        noVideoMessage.style.display = 'block';
+        noVideoMessage.innerHTML = `Bem-vindo à TV Marinho! <br><span>${message}</span>`;
+        gradeIframe.src = ''; // Limpa a grade quando nenhum vídeo de TV está selecionado
+        if (currentGradeRefreshInterval) {
+            clearInterval(currentGradeRefreshInterval);
+            currentGradeRefreshInterval = null; // Reseta o handle do intervalo
+        }
+    }
+    
+    // Função para exibir o conteúdo dos Canais de TV
+    function showTvChannelsContent(videoUrl, gradeUrl, channelName = '') {
+        // Oculta todas as views primeiro
+        document.querySelectorAll('.content-view').forEach(view => {
+            view.style.display = 'none';
+        });
+        tvChannelsView.style.display = 'flex'; // Exibe a visão de Canais de TV
+
+        // Garante que o botão de voltar do WarezCDN está escondido quando na visão de TV
+        backToWarezCdnCatalog.style.display = 'none';
+
+        if (videoUrl) {
+            showPlayerLoader();
+            // Tenta reproduzir HLS
+            if (videoPlayer.canPlayType('application/vnd.apple.mpegurl')) {
+                videoPlayer.src = videoUrl;
+                videoPlayer.play().catch(e => console.error("Erro ao tentar autoplay (nativo):", e));
+            } else if (window.Hls && Hls.isSupported()) {
+                // Se já existir uma instância de Hls, destruí-la antes de criar uma nova
+                if (videoPlayer.__hlsInstance) {
+                    videoPlayer.__hlsInstance.destroy();
+                }
+                const hls = new Hls({
+                    lowLatencyMode: false,
+                    liveBackBufferLength: 60, // Quantos segundos de buffer para trás manter para live (maior = mais buffer)
+                    maxBufferLength: 15, // Quantos segundos de buffer para frente construir (menor = mais responsivo)
+                    maxMaxBufferLength: 30, // Limite máximo de buffer (evita estourar memória)
+                    progressive: true // Tenta usar playback progressivo se possível
+                });
+                hls.loadSource(videoUrl);
+                hls.attachMedia(videoPlayer);
+                videoPlayer.__hlsInstance = hls; // Guarda a instância para destruir depois
+                hls.on(Hls.Events.MANIFEST_PARSED, () => {
+                    videoPlayer.play().catch(e => console.error("Erro ao tentar autoplay (hls.js):", e));
+                });
+                hls.on(Hls.Events.ERROR, (event, data) => {
+                    if (data.fatal) {
+                        console.error('HLS.js fatal error:', data);
+                        showNoPlayerMessage(`Não foi possível carregar o canal '${channelName}'. Erro: ${data.details}.`);
+                    } else {
+                        console.warn('HLS.js non-fatal error:', data);
+                    }
+                });
+            } else {
+                showNoPlayerMessage('Seu navegador não suporta a reprodução deste tipo de vídeo (HLS).');
+                return; // Sai da função para não tentar carregar
+            }
+
+            videoPlayer.onload = () => {
+                hidePlayerLoader();
+            };
+            videoPlayer.onerror = () => {
+                hidePlayerLoader();
+                showNoPlayerMessage(`Não foi possível carregar o vídeo para o canal '${channelName}'. Tente outro canal.`);
+            };
+            // Define o player como mutado por padrão, será desmutado na primeira interação do usuário
+            videoPlayer.muted = true;
+
+        } else {
+            showNoPlayerMessage();
+        }
+
+        if (gradeUrl) {
+            gradeIframe.src = gradeUrl;
+            // Limpa qualquer intervalo existente antes de definir um novo
+            if (currentGradeRefreshInterval) {
+                clearInterval(currentGradeRefreshInterval);
+                currentGradeRefreshInterval = null;
+            }
+            // Define novo intervalo para a grade atual
+            currentGradeRefreshInterval = setInterval(() => {
+                console.log('Atualizando grade para:', channelName || videoUrl);
+                gradeIframe.src = gradeUrl; // Recarrega o iframe da grade
+            }, 300000); // Atualiza a cada 5 minutos (300000 ms)
+        } else {
+            gradeIframe.src = '';
+            if (currentGradeRefreshInterval) {
+                clearInterval(currentGradeRefreshInterval);
+                currentGradeRefreshInterval = null;
+            }
+        }
+    }
+
+    // Função para exibir o conteúdo do WarezCDN
+    function showWarezCdnContent(url) {
+        // Oculta todas as outras views primeiro
+        document.querySelectorAll('.content-view').forEach(view => {
+            view.style.display = 'none';
+        });
+        warezCdnView.style.display = 'flex'; // Exibe a visão de navegação do WarezCDN
+
+        warezCdnLoader.style.display = 'block'; // Mostra o loader para o iframe de navegação
+        warezCdnContentIframe.style.display = 'none'; // Esconde o iframe de navegação inicialmente
+        warezCdnLoadingMessage.style.display = 'block';
+        warezCdnLoadingMessage.textContent = 'Carregando catálogo WarezCDN...'; 
+
+        warezCdnContentIframe.src = url; // Carrega a URL do catálogo
+
+        warezCdnContentIframe.onload = () => {
+            warezCdnLoader.style.display = 'none';
+            warezCdnContentIframe.style.display = 'block';
+            warezCdnLoadingMessage.style.display = 'none';
+            
+            // Lógica para mostrar/esconder o botão "Voltar"
+            const currentIframeSrc = warezCdnContentIframe.src;
+            const isPlayerPage = currentIframeSrc.startsWith('https://embed.warezcdn.link/filme/') ||
+                                 currentIframeSrc.startsWith('https://embed.warezcdn.link/serie/');
+
+            if (isPlayerPage) {
+                backToWarezCdnCatalog.style.display = 'block'; // Mostra o botão
+            } else {
+                backToWarezCdnCatalog.style.display = 'none'; // Esconde o botão (se for o catálogo)
+            }
+        };
+        warezCdnContentIframe.onerror = () => {
+            warezCdnLoader.style.display = 'none';
+            warezCdnContentIframe.style.display = 'none';
+            warezCdnLoadingMessage.textContent = 'Não foi possível carregar o conteúdo do WarezCDN. Verifique a URL ou sua conexão.';
+            warezCdnLoadingMessage.style.display = 'block';
+            backToWarezCdnCatalog.style.display = 'none'; // Esconde o botão em caso de erro
+        };
+
+        // Limpa qualquer intervalo de atualização da grade de TV existente
+        if (currentGradeRefreshInterval) {
+            clearInterval(currentGradeRefreshInterval);
+            currentGradeRefreshInterval = null;
+        }
+    }
+
+    // Event listener para o botão "Voltar para o Catálogo"
+    backToWarezCdnCatalog.addEventListener('click', () => {
+        showWarezCdnContent('https://warezcdn.link/conteudo'); // Recarrega a página do catálogo
+    });
+
+    // Lógica principal de eventos de seleção
+    selects.forEach(select => {
+      select.addEventListener('change', (event) => {
+        // Desseleciona todos os outros selects para que apenas um fique selecionado por vez
+        selects.forEach(s => {
+          if (s !== event.target) {
+            // Verifica se o select tem uma opção padrão vazia e selecionável
+            const defaultOption = s.querySelector('option[value=""][disabled][selected]');
+            if (defaultOption) {
+                s.value = ""; // Reseta os outros selects para a opção padrão
+            } else {
+                // Se não houver uma opção padrão, tente desselecionar (pode não funcionar visualmente em todos os browsers)
+                s.selectedIndex = -1; // Ou defina para a primeira opção se preferir
+            }
+          }
+        });
+
+        const selectedOption = event.target.options[event.target.selectedIndex];
+
+        // Determina qual conteúdo mostrar com base no ID do elemento 'select' selecionado
+        if (event.target.id === 'warezCdnSelector') {
+            const warezCdnUrl = selectedOption.value; // A URL para o conteúdo WarezCDN
+            if (warezCdnUrl) { // Só carrega se a opção não for a default vazia
+                showWarezCdnContent(warezCdnUrl);
+            }
+        } else {
+            // Este é um seletor de canal de TV regular
+            const videoUrl = selectedOption.value;
+            const gradeUrl = selectedOption.getAttribute('data-grade');
+            const channelName = selectedOption.textContent; // Pega o nome do canal para logs
+            if (videoUrl) { // Só carrega se a opção não for a default vazia
+                showTvChannelsContent(videoUrl, gradeUrl, channelName);
+            }
+        }
+      });
+    });
+
+    // --- Lógica de Navegação por Controle Remoto (D-pad) ---
+    const KEY = {
+      LEFT: 37, UP: 38, RIGHT: 39, DOWN: 40, ENTER: 13,
+      BACK: 8, ESC: 27, // Common browser ESC, some TVs map Back to 8
+      // Note: Tizen specific hardware keys (e.g., 10009 for Back) might require Tizen Web APIs,
+      // but for browser navigation, standard key codes are usually sufficient.
+    };
+
+    // Helper para obter elementos focáveis que queremos controlar com o D-pad
+    function getFocusables() {
+      // Inclui todos os selects na navegação e o botão de voltar do WarezCDN
+      const focusableSelectors = 'nav select, .warez-back-button';
+      // Filtra elementos que estão visíveis (offsetWidth ou offsetHeight > 0)
+      return Array.from(document.querySelectorAll(focusableSelectors))
+                   .filter(el => el.offsetParent !== null && (el.offsetWidth > 0 || el.offsetHeight > 0)); 
+    }
+
+    // Função para gerenciar o movimento do foco com base nas setas do controle
+    function navigateFocus(direction) {
+      const focusables = getFocusables();
+      if (focusables.length === 0) return;
+
+      let currentFocused = document.activeElement;
+      let currentIndex = -1;
+
+      // Encontra o índice do elemento atualmente focado
+      if (currentFocused && focusables.includes(currentFocused)) {
+        currentIndex = focusables.indexOf(currentFocused);
+      } else {
+        // Se nada estiver focado, foca o primeiro elemento focável
+        focusables[0].focus();
+        return;
+      }
+
+      let nextIndex = currentIndex; // Por padrão, mantém o foco no mesmo lugar
+
+      switch (direction) {
+        case 'left':
+          // Navega entre os selects na barra lateral
+          if (currentFocused.tagName === 'SELECT' && currentIndex > 0) {
+            nextIndex--;
+          } else if (currentFocused.tagName === 'SELECT' && currentIndex === 0) {
+            // Se estiver no primeiro select, pode ir para o último (loop)
+            nextIndex = focusables.filter(el => el.tagName === 'SELECT').length -1;
+          }
+          break;
+        case 'right':
+          // Navega entre os selects na barra lateral
+          if (currentFocused.tagName === 'SELECT' && currentIndex < focusables.filter(el => el.tagName === 'SELECT').length - 1) {
+            nextIndex++;
+          } else if (currentFocused.tagName === 'SELECT' && currentIndex === focusables.filter(el => el.tagName === 'SELECT').length - 1) {
+            // Se estiver no último select, pode ir para o primeiro (loop)
+            nextIndex = 0;
+          }
+          break;
+        case 'up':
+          // Do botão 'Voltar' do WarezCDN para o último select da barra lateral
+          if (currentFocused === backToWarezCdnCatalog && backToWarezCdnCatalog.offsetParent !== null) {
+            const navSelects = focusables.filter(el => el.tagName === 'SELECT');
+            if (navSelects.length > 0) {
+              nextIndex = focusables.indexOf(navSelects[navSelects.length - 1]);
+            }
+          } else if (currentFocused.tagName === 'SELECT' && currentIndex > 0) {
+            // Navega entre selects para cima
+            nextIndex--;
+          } else if (currentFocused.tagName === 'SELECT' && currentIndex === 0) {
+            // Se estiver no primeiro select, pode ir para o último (loop)
+            nextIndex = focusables.filter(el => el.tagName === 'SELECT').length -1;
+          }
+          break;
+        case 'down':
+          // Dos selects da barra lateral para o botão 'Voltar' do WarezCDN (se visível)
+          if (currentFocused.tagName === 'SELECT' && warezCdnView.style.display === 'flex' && backToWarezCdnCatalog.offsetParent !== null) {
+            // Se houver um botão de voltar visível no WarezCDN, tenta focar nele
+            if (focusables.includes(backToWarezCdnCatalog)) {
+              nextIndex = focusables.indexOf(backToWarezCdnCatalog);
+            }
+          } else if (currentFocused.tagName === 'SELECT' && currentIndex < focusables.filter(el => el.tagName === 'SELECT').length - 1) {
+            // Navega entre selects para baixo
+            nextIndex++;
+          } else if (currentFocused.tagName === 'SELECT' && currentIndex === focusables.filter(el => el.tagName === 'SELECT').length - 1) {
+            // Se estiver no último select, pode ir para o primeiro (loop)
+            nextIndex = 0;
+          }
+          break;
+      }
+
+      // Foca o próximo elemento, se encontrado
+      if (focusables[nextIndex]) {
+        focusables[nextIndex].focus();
+      }
+    }
+
+    // Event listener principal para as teclas do controle remoto
+    document.addEventListener('keydown', (e) => {
+      // Primeira interação do usuário: desmuta o player
+      if (!userInteracted && videoPlayer && videoPlayer.muted) {
+        videoPlayer.muted = false;
+        userInteracted = true;
+      }
+
+      const currentActiveElement = document.activeElement;
+
+      switch (e.keyCode) {
+        case KEY.LEFT:
+        case KEY.RIGHT:
+        case KEY.UP:
+        case KEY.DOWN:
+          e.preventDefault(); // Impede o comportamento padrão do navegador (ex: scroll)
+          navigateFocus(e.keyCode === KEY.LEFT ? 'left' : e.keyCode === KEY.RIGHT ? 'right' : e.keyCode === KEY.UP ? 'up' : 'down');
+          break;
+
+        case KEY.ENTER:
+          e.preventDefault(); // Impede o comportamento padrão do navegador
+          if (currentActiveElement) {
+            if (currentActiveElement.tagName === 'SELECT') {
+              // Para SELECTs, dispara o evento 'change' manualmente
+              const event = new Event('change');
+              currentActiveElement.dispatchEvent(event);
+            } else {
+              // Para outros elementos focáveis (ex: botões), simula um clique
+              currentActiveElement.click();
+            }
+          }
+          break;
+
+        case KEY.BACK:
+        case KEY.ESC:
+          e.preventDefault(); // Impede o comportamento padrão do navegador (ex: voltar página)
+          if (warezCdnView.style.display === 'flex') { // Se a visão WarezCDN estiver ativa
+            const currentIframeSrc = warezCdnContentIframe.src;
+            // Verifica se o iframe está em uma página de player de filme/série do WarezCDN
+            const isPlayerPage = currentIframeSrc.startsWith('https://embed.warezcdn.link/filme/') ||
+                                 currentIframeSrc.startsWith('https://embed.warezcdn.link/serie/');
+
+            if (isPlayerPage) {
+              showWarezCdnContent('https://warezcdn.link/conteudo'); // Volta para o catálogo WarezCDN
+            } else {
+              // Se já estiver no catálogo WarezCDN, volta para a visão de canais de TV
+              showTvChannelsContent('', ''); // Limpa o player e mostra a visão padrão de TV
+              // Após trocar a view, tenta focar no primeiro elemento focável da nova view
+              setTimeout(() => { // Pequeno delay para garantir que os elementos estejam visíveis
+                  const firstFocusable = getFocusables()[0];
+                  if (firstFocusable) firstFocusable.focus();
+              }, 50);
+            }
+          } else {
+            // Se não estiver na visão WarezCDN, faz o comportamento de voltar do navegador
+            history.back();
+          }
+          break;
+      }
+    });
+
+    // Estado inicial ao carregar a página: mostra a visão de Canais de TV e define o foco inicial
+    document.addEventListener('DOMContentLoaded', () => {
+        showTvChannelsContent('', ''); // Inicializa com a visão de Canais de TV, sem vídeo tocando
+        // Define o foco no primeiro elemento focável (geralmente o primeiro select)
+        const firstFocusable = getFocusables()[0];
+        if (firstFocusable) {
+            firstFocusable.focus();
+        }
+    });
+  </script>
+</body>
+</html>
