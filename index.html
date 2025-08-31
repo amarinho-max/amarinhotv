@@ -166,7 +166,8 @@
       transition: box-shadow 0.3s ease;
     }
 
-    iframe#videoPlayer {
+    /* Alterado de iframe para video */
+    video#videoPlayer {
       width: 100%;
       height: 100%;
       border: none;
@@ -294,7 +295,7 @@
       .main-header h1 {
         font-size: 2.8em;
       }
-      .player-container, iframe#gradeIframe, iframe#warezCdnContentIframe { /* Inclui o novo iframe */
+      .player-container, video#videoPlayer, iframe#gradeIframe, iframe#warezCdnContentIframe { /* Inclui o novo iframe */
         width: 95%; /* Ajusta a largura para telas um pouco menores */
       }
       iframe#warezCdnContentIframe {
@@ -346,7 +347,7 @@
         font-size: 2.2em;
         letter-spacing: 2px;
       }
-      .player-container, iframe#gradeIframe, iframe#warezCdnContentIframe { /* Inclui o novo iframe */
+      .player-container, video#videoPlayer, iframe#gradeIframe, iframe#warezCdnContentIframe { /* Inclui o novo iframe */
         width: 100%; /* Largura total para mobile */
         box-shadow: 0 4px 20px var(--highlight-shadow); /* Sombra menos intensa */
       }
@@ -451,7 +452,7 @@
         <option value="https://embedtv-3.icu/tntnovelas" data-grade="https://www.guiadetv.com/canal/tnt-novelas">TNT Novelas</option>
         <option value="https://%72%65%64%65%63%61%6E%61%69%73%74%76%2E%67%64/player3/ch.php?canal=tntnovelas" data-grade="https://www.guiadetv.com/canal/tnt-novelas">TNT Novelas 2</option>
         <option value="https://embedtv-3.icu/tntseries" data-grade="https://meuguia.tv/programacao/canal/TNS">TNT Series</option>
-        <option value="https://%72%65%64%65%63%61%6E%61%69%73%74%76%2E%67%64/player3/ch.php?canal=tntseries" data-grade="https://meuguia.tv/programacao/canal/TNS">TNT Series 2</option>
+        <option value="https://%72%65%64%65%63%61%6N%61%69%73%74%76%2E%67%64/player3/ch.php?canal=tntseries" data-grade="https://meuguia.tv/programacao/canal/TNS">TNT Series 2</option>
         <option value="https://embedtv-3.icu/tcm" data-grade="https://meuguia.tv/programacao/canal/TCM">TCM</option>
       </select>
       <select id="videoList3">
@@ -547,7 +548,8 @@
         <!-- Visão de Canais de TV (padrão) -->
         <div id="tvChannelsView" class="content-view">
           <div class="player-container">
-            <iframe id="videoPlayer" src="" allowfullscreen allow="autoplay; fullscreen" scrolling="no"></iframe>
+            <!-- Corrigido para <video> tag -->
+            <video id="videoPlayer" controls autoplay muted playsinline></video>
             <div class="loader" id="playerLoader"></div>
             <div class="no-video-message" id="noVideoMessage">
                 Bem-vindo à TV Marinho! <br>
@@ -561,7 +563,7 @@
         <div id="warezCdnView" class="content-view">
             <!-- Botão de voltar para o catálogo WarezCDN -->
             <button id="backToWarezCdnCatalog" class="warez-back-button" style="display: none;">← Voltar para o Catálogo</button>
-            <iframe id="warezCdnContentIframe" src="" allowfullscreen allow="autoplay; fullscreen" scrolling="no"></iframe>
+            <iframe id="warezCdnContentIframe" src="" allow="autoplay; fullscreen" scrolling="no"></iframe>
             <div class="loader" id="warezCdnLoader"></div>
             <div class="no-video-message" id="warezCdnLoadingMessage">
                 Carregando catálogo WarezCDN...
@@ -575,7 +577,7 @@
   <script>
     // Referências aos elementos HTML existentes e aos novos
     const selects = document.querySelectorAll('nav select');
-    const videoPlayer = document.getElementById('videoPlayer');
+    const videoPlayer = document.getElementById('videoPlayer'); // Agora é um elemento <video>
     const gradeIframe = document.getElementById('gradeIframe');
     const playerLoader = document.getElementById('playerLoader');
     const noVideoMessage = document.getElementById('noVideoMessage');
@@ -665,9 +667,11 @@
                 return; // Sai da função para não tentar carregar
             }
 
-            videoPlayer.onload = () => {
+            videoPlayer.onload = () => { // Evento onload para <video> é 'loadeddata' ou 'canplay'
                 hidePlayerLoader();
             };
+            // Adicionando listener para o evento loadeddata (quando o primeiro frame de mídia é carregado)
+            videoPlayer.addEventListener('loadeddata', hidePlayerLoader);
             videoPlayer.onerror = () => {
                 hidePlayerLoader();
                 showNoPlayerMessage(`Não foi possível carregar o vídeo para o canal '${channelName}'. Tente outro canal.`);
